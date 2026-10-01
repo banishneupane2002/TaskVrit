@@ -7,6 +7,8 @@ import CartDrawer from '@/components/CartDrawer';
 export default async function ProductsPage() {
   const products = await apiClient<Product[]>('/products');
 
+  
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* 1. Our new Top Bar */}

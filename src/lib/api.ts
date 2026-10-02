@@ -1,4 +1,5 @@
 import { MOCK_PRODUCTS } from './mock-products';
+
 const BASE_URL = 'https://fakestoreapi.com';
 
 export class ApiError extends Error {
@@ -18,10 +19,12 @@ export async function apiClient<T>(
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = `${BASE_URL}${cleanEndpoint}`;
 
+  // Real browser headers so Cloudflare doesn't block Vercel servers
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
-    // Helps prevent public APIs from blocking server requests
-    'User-Agent': 'Mozilla/5.0 (compatible; NextJsEcommerce/1.0)',
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    Accept: 'application/json, text/plain, */*',
   };
 
   try {
@@ -31,23 +34,33 @@ export async function apiClient<T>(
         ...defaultHeaders,
         ...options.headers,
       },
-      // Disable aggressive caching during development so we always see fresh data
       cache: 'no-store',
     });
 
     if (!response.ok) {
       throw new ApiError(`Remote API error: ${response.status}`, response.status);
     }
+
     const data: T = await response.json();
     return data;
   } catch (error) {
-    console.warn(`[API Notice] FakeStoreAPI is unreachable (${error}). Using fallback data.`);
-    
-    // If the API is down and asking for products, return our mock data!
-    
+    console.warn(`[API Notice] FakeStoreAPI unreachable on cloud server (${error}). Using fallback.`);
+
+    // 1. If asking for a SINGLE product like /products/1
+    const parts = cleanEndpoint.split('/').filter(Boolean);
+    if (parts[0] === 'products' && parts[1]) {
+      const targetId = Number(parts[1]);
+      const foundProduct = MOCK_PRODUCTS.find((p) => p.id === targetId);
+      if (foundProduct) {
+        return foundProduct as unknown as T;
+      }
+    }
+
+    // 2. If asking for ALL products
     if (cleanEndpoint.includes('/products')) {
       return MOCK_PRODUCTS as unknown as T;
     }
+
     throw error;
   }
 }
